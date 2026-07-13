@@ -4,7 +4,7 @@ An interactive 3D map of every parcel in Duval County / Jacksonville, FL, extrud
 by its 2025 assessed value. Built from Duval County Property Appraiser (DCPAO) open
 data joined to the county parcel polygon shapefile.
 
-**[▶ Open the live map](https://USERNAME.github.io/REPO/)** ← update this link after enabling GitHub Pages
+**[▶ Open the live map](https://mrronnoc32.github.io/duval-assessed-value-3d/)**
 
 ## What you can do
 
