@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Duval County — Assessed Value (3D)</title>
+  <style>select.metric { font-size: 12px; padding: 2px 4px; }</style>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link
+    href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css"
+    rel="stylesheet"
+  />
+  <style>
+    html, body, #map { height: 100%; margin: 0; padding: 0; }
+    body { font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #111; }
+    #map { position: absolute; inset: 0; background: #0c1218; }
+    .panel {
+      position: absolute; z-index: 5;
+      background: rgba(255,255,255,0.94);
+      backdrop-filter: blur(6px);
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+      padding: 12px 14px;
+    }
+    #title { top: 12px; left: 12px; max-width: 320px; }
+    #title h1 { font-size: 15px; margin: 0 0 4px; }
+    #title p  { margin: 0; color: #444; font-size: 12px; }
+    #legend  { bottom: 12px; left: 12px; min-width: 220px; max-width: 260px; }
+    #legend .scale {
+      height: 12px; border-radius: 2px; margin: 6px 0 4px;
+      background: linear-gradient(to right,
+        #2b0a3d, #4b186d, #7a2f8f, #b0479d, #d96791, #f08c7c, #f7b16a, #f5d365, #efee75);
+    }
+    #legend .ticks { display: flex; justify-content: space-between; font-size: 11px; color: #555; }
+    #legend .swatches { display: grid; grid-template-columns: 16px 14px 1fr auto; gap: 3px 6px; margin-top: 4px; font-size: 11px; align-items: center; }
+    #legend .sw { width: 14px; height: 10px; border-radius: 2px; }
+    #legend input[type=checkbox] { margin: 0; }
+    #legend .catRow { display: contents; cursor: pointer; }
+    #legend .catRow:hover .catLabel { color: #000; text-decoration: underline; }
+    #legend .catLabel { color: #222; }
+    #legend .catCount { color: #666; font-variant-numeric: tabular-nums; }
+    #legend .quickToggles { margin: 6px 0 2px; font-size: 11px; }
+    #legend .quickToggles a { color: #2160a0; cursor: pointer; text-decoration: none; }
+    #legend .quickToggles a:hover { text-decoration: underline; }
+    #legend .quickToggles span { color: #888; padding: 0 4px; }
+    #controls { top: 12px; right: 12px; }
+    #controls label { display: block; margin-bottom: 6px; font-size: 12px; }
+    #controls input[type=range] { width: 180px; }
+    #tooltip {
+      position: absolute; pointer-events: none; z-index: 10;
+      background: rgba(20,24,30,0.92); color: #fff;
+      padding: 6px 8px; border-radius: 4px; font-size: 12px;
+      max-width: 260px;
+      transform: translate(8px, 8px);
+      display: none;
+    }
+    #status { position: absolute; bottom: 12px; right: 12px; z-index: 5;
+      background: rgba(255,255,255,0.92); padding: 6px 10px; border-radius: 4px;
+      font-size: 12px; color: #333; }
+    a { color: #2160a0; }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<div id="title" class="panel">
+  <h1>Duval County — Assessed Value</h1>
+  <p>Each parcel is extruded by its 2025 assessed value (SOH_VAL). Drag to rotate, scroll to zoom.</p>
+</div>
+
+<div id="legend" class="panel">
+  <div id="legendGradient">
+    <div id="legendTitle"><b>Assessed value / acre</b> (log scale)</div>
+    <div class="scale"></div>
+    <div id="legendTicks" class="ticks">
+      <span>$10k</span><span>$100k</span><span>$1M</span><span>$10M</span><span>$100M+</span>
+    </div>
+  </div>
+  <div id="legendCategory" style="display:none">
+    <div><b>Land-use category</b> <span style="color:#888">(click to filter)</span></div>
+    <div class="quickToggles">
+      <a id="catAll">show all</a><span>·</span><a id="catNone">hide all</a>
+    </div>
+    <div class="swatches" id="categorySwatches"></div>
+  </div>
+</div>
+
+<div id="controls" class="panel">
+  <label>Metric:
+    <select id="metricSelect" class="metric">
+      <option value="value">Total assessed value</option>
+      <option value="per_acre" selected>Assessed value / acre</option>
+    </select>
+  </label>
+  <label>Color by:
+    <select id="colorSelect" class="metric">
+      <option value="metric">Value (gradient)</option>
+      <option value="category" selected>Land-use category</option>
+    </select>
+  </label>
+  <label>Basemap:
+    <select id="basemapSelect" class="metric">
+      <option value="sat" selected>Satellite (aerial)</option>
+      <option value="streets">Streets</option>
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
+  </label>
+  <label style="display:flex; align-items:center; gap:6px;">
+    <input id="labelsToggle" type="checkbox" checked style="width:auto;" /> Street / place labels
+  </label>
+  <label style="margin-top:8px;">Height exaggeration: <span id="heightVal">1.0×</span></label>
+  <input id="heightSlider" type="range" min="0.1" max="10" step="0.1" value="1.0" />
+  <label style="margin-top:8px;">Scale curve: <span id="curveVal">0.45</span></label>
+  <input id="curveSlider" type="range" min="0.30" max="1.00" step="0.01" value="0.45" />
+  <label style="margin-top:8px;">Min value: $<span id="minVal">1,000</span></label>
+  <input id="minSlider" type="range" min="0" max="6" step="0.25" value="3" />
+</div>
+
+<div id="tooltip"></div>
+<div id="status">loading parcels…</div>
+
+<script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/deck.gl@9.0.30/dist.min.js"></script>
+
+<script>
+const JAX_VIEW = {
+  longitude: -81.66,
+  latitude: 30.34,
+  zoom: 10.5,
+  pitch: 55,
+  bearing: -15,
+};
+
+// Magma-ish ramp (matches the legend gradient).
+const RAMP = [
+  [43,10,61], [75,24,109], [122,47,143], [176,71,157],
+  [217,103,145], [240,140,124], [247,177,106], [245,211,101], [239,238,117]
+];
+
+function lerpColor(t) {
+  t = Math.max(0, Math.min(1, t));
+  const x = t * (RAMP.length - 1);
+  const i = Math.floor(x);
+  const f = x - i;
+  const a = RAMP[i], b = RAMP[Math.min(i + 1, RAMP.length - 1)];
+  return [
+    Math.round(a[0] + (b[0] - a[0]) * f),
+    Math.round(a[1] + (b[1] - a[1]) * f),
+    Math.round(a[2] + (b[2] - a[2]) * f),
+  ];
+}
+
+// Per-metric color-ramp domains (log space).
+const METRIC_DOMAINS = {
+  value:    { lo: 1000,  hi: 10_000_000,
+              title: 'Assessed value', ticks: ['$1k','$10k','$100k','$1M','$10M+'] },
+  per_acre: { lo: 10_000, hi: 100_000_000,
+              title: 'Assessed value / acre', ticks: ['$10k','$100k','$1M','$10M','$100M+'] },
+};
+
+let currentMetric = 'per_acre';
+
+function metricValue(d) {
+  if (currentMetric === 'per_acre') {
+    return d.a > 0 ? d.v / d.a : 0;
+  }
+  return d.v;
+}
+
+function valueToT(v) {
+  if (v <= 0) return 0;
+  const { lo, hi } = METRIC_DOMAINS[currentMetric];
+  return (Math.log10(v) - Math.log10(lo)) / (Math.log10(hi) - Math.log10(lo));
+}
+
+function fmtMoney(v) {
+  if (v >= 1e9) return '$' + (v / 1e9).toFixed(2) + 'B';
+  if (v >= 1e6) return '$' + (v / 1e6).toFixed(2) + 'M';
+  if (v >= 1e3) return '$' + (v / 1e3).toFixed(1) + 'k';
+  return '$' + v.toLocaleString();
+}
+
+// Key-free basemap sources (Google Maps requires an API key + its own SDK).
+const BASEMAP_STYLE = {
+  version: 8,
+  sources: {
+    sat: {
+      type: 'raster',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      attribution: 'Imagery © Esri, Maxar, Earthstar Geographics',
+    },
+    streets: {
+      type: 'raster',
+      tiles: ['https://basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors © CARTO',
+    },
+    light: {
+      type: 'raster',
+      tiles: ['https://basemaps.cartocdn.com/rastertiles/light_nolabels/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors © CARTO',
+    },
+    dark: {
+      type: 'raster',
+      tiles: ['https://basemaps.cartocdn.com/rastertiles/dark_nolabels/{z}/{x}/{y}.png'],
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors © CARTO',
+    },
+    labels: {
+      type: 'raster',
+      tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'],
+      tileSize: 256,
+      attribution: 'Labels © Esri',
+    },
+  },
+  layers: [
+    { id: 'basemap-sat',     type: 'raster', source: 'sat',     layout: { visibility: 'visible' } },
+    { id: 'basemap-streets', type: 'raster', source: 'streets', layout: { visibility: 'none' } },
+    { id: 'basemap-light',   type: 'raster', source: 'light',   layout: { visibility: 'none' } },
+    { id: 'basemap-dark',    type: 'raster', source: 'dark',    layout: { visibility: 'none' } },
+    { id: 'overlay-labels',  type: 'raster', source: 'labels',  layout: { visibility: 'visible' } },
+  ],
+};
+const BASEMAP_LAYER_IDS = {
+  sat: 'basemap-sat', streets: 'basemap-streets',
+  light: 'basemap-light', dark: 'basemap-dark',
+};
+
+const map = new maplibregl.Map({
+  container: 'map',
+  style: BASEMAP_STYLE,
+  center: [JAX_VIEW.longitude, JAX_VIEW.latitude],
+  zoom: JAX_VIEW.zoom,
+  pitch: JAX_VIEW.pitch,
+  bearing: JAX_VIEW.bearing,
+  antialias: true,
+});
+
+let parcelsRaw = null;     // raw array of {v, a, u, p}
+let currentFilterMin = 1000;
+let currentHeightMul = 1.0;
+let currentCurve = 0.45;   // exponent for elevation power-curve
+let currentColorMode = 'category'; // 'metric' | 'category'
+let enabledCategories = null;      // Set<string> of category keys; null = all visible
+
+// Florida DOR Uniform Property Code → broad category.
+// Bucketed by 1st digit (and a few 2nd-digit exceptions for clarity).
+const CATEGORIES = [
+  { key: 'sfr',   label: 'Single-family residential', color: [255, 215, 110] },
+  { key: 'multi', label: 'Condo / multi-family',       color: [240, 140, 70]  },
+  { key: 'vacR',  label: 'Vacant residential',          color: [200, 195, 150] },
+  { key: 'comm',  label: 'Commercial / retail / office', color: [220, 60, 70]   },
+  { key: 'indus', label: 'Industrial / warehouse',      color: [140, 80, 160]  },
+  { key: 'ag',    label: 'Agricultural',                color: [110, 165, 80]  },
+  { key: 'inst',  label: 'Institutional (church/school/private)', color: [80, 140, 200]  },
+  { key: 'govt',  label: 'Government / public',         color: [60, 100, 150]  },
+  { key: 'util',  label: 'Utilities / infrastructure',  color: [120, 120, 130] },
+  { key: 'parks', label: 'Parks / open water',          color: [70, 170, 150]  },
+  { key: 'other', label: 'Other / misc',                color: [140, 140, 140] },
+];
+const CAT_INDEX = Object.fromEntries(CATEGORIES.map((c, i) => [c.key, i]));
+
+function dorCategory(u) {
+  if (!u) return 'other';
+  const d = u.padStart(4, '0').slice(0, 2);
+  const n = parseInt(d, 10);
+  if (Number.isNaN(n)) return 'other';
+  if (n === 0)  return 'vacR';
+  if (n === 1)  return 'sfr';
+  if (n >= 2  && n <= 9)  return 'multi';   // mobile homes, condos, coops, multi-family
+  if (n >= 10 && n <= 19) return 'comm';    // commercial / retail / office
+  if (n >= 20 && n <= 39) {                 // mostly commercial services + a bit of recreation
+    // 38=golf courses, 39=hotels: still commercial.
+    return 'comm';
+  }
+  if (n >= 40 && n <= 49) return 'indus';   // industrial / warehouse
+  if (n >= 50 && n <= 69) return 'ag';      // agricultural
+  if (n >= 70 && n <= 79) return 'inst';    // institutional (churches, private schools)
+  if (n === 82 || n === 97) return 'parks'; // forest/park/rec, outdoor rec
+  if (n >= 80 && n <= 89) return 'govt';    // government
+  if (n >= 90 && n <= 94) return 'util';    // utilities
+  if (n === 95) return 'parks';             // rivers/lakes
+  if (n >= 96 && n <= 99) return 'util';    // sewage/landfill/misc
+  return 'other';
+}
+
+function categoryColor(u) {
+  return CATEGORIES[CAT_INDEX[dorCategory(u)]].color;
+}
+
+const status = document.getElementById('status');
+const tooltip = document.getElementById('tooltip');
+
+const deckOverlay = new deck.MapboxOverlay({ layers: [] });
+map.addControl(deckOverlay);
+
+// The map can initialize before the container has its final size (esp. in
+// embedded preview panes). Force a resize on load, on window resize, and
+// whenever the container's box changes.
+function fitMap() { map.resize(); }
+window.addEventListener('resize', fitMap);
+if (window.ResizeObserver) {
+  new ResizeObserver(fitMap).observe(document.getElementById('map'));
+}
+
+async function load() {
+  fitMap();  // ensure the canvas matches the container now that layout has settled
+  status.textContent = 'fetching parcels.json…';
+  const t0 = performance.now();
+  const res = await fetch('parcels.json');
+  if (!res.ok) {
+    status.textContent = 'failed to load parcels.json: ' + res.status;
+    return;
+  }
+  const data = await res.json();
+  parcelsRaw = data.parcels;
+  status.textContent = `${parcelsRaw.length.toLocaleString()} parcels loaded in ${((performance.now()-t0)/1000).toFixed(1)}s — rendering…`;
+  renderCategoryLegend();  // now that we have data, fill in the counts
+  rebuildLayer();
+  setTimeout(() => { status.textContent = `${parcelsRaw.length.toLocaleString()} parcels — drag to rotate`; }, 1200);
+}
+
+function rebuildLayer() {
+  if (!parcelsRaw) return;
+  const catFilter = enabledCategories; // null = all
+  const filtered = parcelsRaw.filter(d => {
+    if (currentFilterMin > 0 && metricValue(d) < currentFilterMin) return false;
+    if (catFilter && !catFilter.has(dorCategory(d.u))) return false;
+    return true;
+  });
+
+  const layer = new deck.PolygonLayer({
+    id: 'parcels',
+    data: filtered,
+    getPolygon: d => d.p,
+    getElevation: d => {
+      const m = metricValue(d);
+      // Power-curve so high-value parcels actually tower.
+      // Per-metric scale factor balances absolute heights between the two views.
+      const k = currentMetric === 'per_acre' ? 0.05 : 0.15;
+      return Math.pow(Math.max(1, m), currentCurve) * k * currentHeightMul;
+    },
+    getFillColor: d => currentColorMode === 'category'
+      ? categoryColor(d.u)
+      : lerpColor(valueToT(metricValue(d))),
+    getLineColor: [0, 0, 0, 0],
+    extruded: true,
+    pickable: true,
+    autoHighlight: true,
+    highlightColor: [255, 255, 255, 120],
+    material: {
+      ambient: 0.55, diffuse: 0.7,
+      shininess: 32, specularColor: [60, 60, 60],
+    },
+    parameters: { depthTest: true },
+    onHover: ({ object, x, y }) => {
+      if (object) {
+        const perAcre = object.a > 0 ? object.v / object.a : null;
+        const cat = CATEGORIES[CAT_INDEX[dorCategory(object.u)]].label;
+        tooltip.style.display = 'block';
+        tooltip.style.left = x + 'px';
+        tooltip.style.top = y + 'px';
+        tooltip.innerHTML =
+          `<b>${cat}</b> <span style="opacity:.7">(DOR ${object.u || '—'})</span><br>` +
+          `<b>Assessed value:</b> ${fmtMoney(object.v)}<br>` +
+          `<b>Acres:</b> ${object.a ? object.a.toFixed(2) : '—'}<br>` +
+          `<b>$/acre:</b> ${perAcre !== null ? fmtMoney(perAcre) : '—'}`;
+      } else {
+        tooltip.style.display = 'none';
+      }
+    },
+  });
+  deckOverlay.setProps({ layers: [layer] });
+}
+
+document.getElementById('heightSlider').addEventListener('input', e => {
+  currentHeightMul = parseFloat(e.target.value);
+  document.getElementById('heightVal').textContent = currentHeightMul.toFixed(1) + '×';
+  rebuildLayer();
+});
+
+document.getElementById('curveSlider').addEventListener('input', e => {
+  currentCurve = parseFloat(e.target.value);
+  document.getElementById('curveVal').textContent = currentCurve.toFixed(2);
+  rebuildLayer();
+});
+
+document.getElementById('metricSelect').addEventListener('change', e => {
+  currentMetric = e.target.value;
+  const dom = METRIC_DOMAINS[currentMetric];
+  document.getElementById('legendTitle').innerHTML = `<b>${dom.title}</b> (log scale)`;
+  document.getElementById('legendTicks').innerHTML =
+    dom.ticks.map(t => `<span>${t}</span>`).join('');
+  renderCategoryLegend();
+  rebuildLayer();
+});
+
+function categoryCounts() {
+  if (!parcelsRaw) return {};
+  const counts = Object.create(null);
+  for (const d of parcelsRaw) {
+    if (currentFilterMin > 0 && metricValue(d) < currentFilterMin) continue;
+    const k = dorCategory(d.u);
+    counts[k] = (counts[k] || 0) + 1;
+  }
+  return counts;
+}
+
+function fmtCount(n) {
+  if (n == null) return '';
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n / 1e3).toFixed(n >= 1e4 ? 0 : 1) + 'k';
+  return n.toLocaleString();
+}
+
+function renderCategoryLegend() {
+  const grid = document.getElementById('categorySwatches');
+  const counts = categoryCounts();
+  const enabled = enabledCategories;
+  grid.innerHTML = CATEGORIES.map(c => {
+    const on = !enabled || enabled.has(c.key);
+    const n = counts[c.key] || 0;
+    return (
+      `<div class="catRow" data-key="${c.key}">` +
+        `<input type="checkbox" data-key="${c.key}" ${on ? 'checked' : ''} />` +
+        `<div class="sw" style="background: rgb(${c.color.join(',')})"></div>` +
+        `<div class="catLabel" style="${on ? '' : 'opacity:.45'}">${c.label}</div>` +
+        `<div class="catCount">${fmtCount(n)}</div>` +
+      `</div>`
+    );
+  }).join('');
+
+  grid.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const key = cb.dataset.key;
+      if (enabledCategories === null) {
+        enabledCategories = new Set(CATEGORIES.map(c => c.key));
+      }
+      if (cb.checked) enabledCategories.add(key);
+      else enabledCategories.delete(key);
+      // If everything is on again, drop the filter to keep behavior identical to "no filter".
+      if (enabledCategories.size === CATEGORIES.length) enabledCategories = null;
+      renderCategoryLegend();
+      rebuildLayer();
+    });
+  });
+
+  // Click on the row (label/swatch) toggles the checkbox.
+  grid.querySelectorAll('.catLabel, .sw').forEach(el => {
+    el.addEventListener('click', e => {
+      const row = e.currentTarget.closest('.catRow');
+      const cb = row.querySelector('input[type=checkbox]');
+      cb.checked = !cb.checked;
+      cb.dispatchEvent(new Event('change'));
+    });
+  });
+}
+
+document.getElementById('catAll').addEventListener('click', () => {
+  enabledCategories = null;
+  renderCategoryLegend();
+  rebuildLayer();
+});
+document.getElementById('catNone').addEventListener('click', () => {
+  enabledCategories = new Set();
+  renderCategoryLegend();
+  rebuildLayer();
+});
+
+renderCategoryLegend();
+
+function updateLegendVisibility() {
+  document.getElementById('legendGradient').style.display =
+    currentColorMode === 'category' ? 'none' : '';
+  document.getElementById('legendCategory').style.display =
+    currentColorMode === 'category' ? '' : 'none';
+}
+updateLegendVisibility();
+
+document.getElementById('colorSelect').addEventListener('change', e => {
+  currentColorMode = e.target.value;
+  updateLegendVisibility();
+  rebuildLayer();
+});
+
+document.getElementById('basemapSelect').addEventListener('change', e => {
+  const pick = e.target.value;
+  for (const [key, layerId] of Object.entries(BASEMAP_LAYER_IDS)) {
+    map.setLayoutProperty(layerId, 'visibility', key === pick ? 'visible' : 'none');
+  }
+});
+
+document.getElementById('labelsToggle').addEventListener('change', e => {
+  map.setLayoutProperty('overlay-labels', 'visibility', e.target.checked ? 'visible' : 'none');
+});
+
+document.getElementById('minSlider').addEventListener('input', e => {
+  // Map slider 0..6 to $0..$1M log-ish: 10^x, but show $0 at extreme left.
+  const x = parseFloat(e.target.value);
+  currentFilterMin = x <= 0 ? 0 : Math.round(Math.pow(10, x));
+  document.getElementById('minVal').textContent = currentFilterMin.toLocaleString();
+  renderCategoryLegend();
+  rebuildLayer();
+});
+
+map.on('load', load);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,6 @@
+# local dev server log
+server.log
+
+# editor / tooling
+.claude/
+.DS_Store
