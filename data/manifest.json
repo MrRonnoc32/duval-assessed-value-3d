@@ -1,0 +1,157 @@
+{
+  "years": [
+    {
+      "year": 2015,
+      "file": "parcels-2015.json.gz",
+      "parcels": 353038,
+      "polygons": 356565,
+      "assessed_total": 64458712260,
+      "skipped": {
+        "zero_or_missing": 4456,
+        "unmatched_geometry": 7672,
+        "invalid_geometry": 13
+      },
+      "unmatched_values": 215
+    },
+    {
+      "year": 2016,
+      "file": "parcels-2016.json.gz",
+      "parcels": 354665,
+      "polygons": 358125,
+      "assessed_total": 67345384926,
+      "skipped": {
+        "zero_or_missing": 4616,
+        "unmatched_geometry": 7729,
+        "invalid_geometry": 15
+      },
+      "unmatched_values": 216
+    },
+    {
+      "year": 2017,
+      "file": "parcels-2017.json.gz",
+      "parcels": 356332,
+      "polygons": 359765,
+      "assessed_total": 71070822201,
+      "skipped": {
+        "zero_or_missing": 4734,
+        "unmatched_geometry": 7511,
+        "invalid_geometry": 11
+      },
+      "unmatched_values": 262
+    },
+    {
+      "year": 2018,
+      "file": "parcels-2018.json.gz",
+      "parcels": 358862,
+      "polygons": 362282,
+      "assessed_total": 75433644730,
+      "skipped": {
+        "zero_or_missing": 4902,
+        "unmatched_geometry": 7704,
+        "invalid_geometry": 10
+      },
+      "unmatched_values": 271
+    },
+    {
+      "year": 2019,
+      "file": "parcels-2019.json.gz",
+      "parcels": 362448,
+      "polygons": 365852,
+      "assessed_total": 80892250058,
+      "skipped": {
+        "zero_or_missing": 5171,
+        "unmatched_geometry": 7756,
+        "invalid_geometry": 9
+      },
+      "unmatched_values": 465
+    },
+    {
+      "year": 2020,
+      "file": "parcels-2020.json.gz",
+      "parcels": 367417,
+      "polygons": 370817,
+      "assessed_total": 86308590752,
+      "skipped": {
+        "zero_or_missing": 5605,
+        "invalid_value": 4,
+        "unmatched_geometry": 8237,
+        "invalid_geometry": 8
+      },
+      "unmatched_values": 340
+    },
+    {
+      "year": 2021,
+      "file": "parcels-2021.json.gz",
+      "parcels": 372059,
+      "polygons": 375438,
+      "assessed_total": 92308644172,
+      "skipped": {
+        "zero_or_missing": 5929,
+        "invalid_value": 1,
+        "unmatched_geometry": 8415,
+        "invalid_geometry": 8
+      },
+      "unmatched_values": 283
+    },
+    {
+      "year": 2022,
+      "file": "parcels-2022.json.gz",
+      "parcels": 377438,
+      "polygons": 380775,
+      "assessed_total": 104086798386,
+      "skipped": {
+        "zero_or_missing": 6405,
+        "unmatched_geometry": 8834,
+        "invalid_geometry": 8
+      },
+      "unmatched_values": 372
+    },
+    {
+      "year": 2023,
+      "file": "parcels-2023.json.gz",
+      "parcels": 381111,
+      "polygons": 384381,
+      "assessed_total": 115649468350,
+      "skipped": {
+        "zero_or_missing": 6705,
+        "unmatched_geometry": 9614,
+        "invalid_geometry": 8
+      },
+      "unmatched_values": 317
+    },
+    {
+      "year": 2024,
+      "file": "parcels-2024.json.gz",
+      "parcels": 386436,
+      "polygons": 389730,
+      "assessed_total": 124159510726,
+      "skipped": {
+        "zero_or_missing": 7161,
+        "invalid_value": 6,
+        "unmatched_geometry": 9770,
+        "invalid_geometry": 8
+      },
+      "unmatched_values": 349
+    },
+    {
+      "year": 2025,
+      "file": "parcels-2025.json.gz",
+      "parcels": 390299,
+      "polygons": 393541,
+      "assessed_total": 133628919268,
+      "skipped": {
+        "zero_or_missing": 7508,
+        "unmatched_geometry": 10163,
+        "invalid_geometry": 8
+      },
+      "unmatched_values": 375
+    }
+  ],
+  "value_fields": [
+    "AV_NSD",
+    "JV"
+  ],
+  "history_shards": 128,
+  "area": "polygon area in source CRS, converted to acres",
+  "comparison": "matching parcel IDs; IDs do not guarantee unchanged boundaries"
+}
