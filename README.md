@@ -10,7 +10,13 @@ Serve this directory with `python3 -m http.server 8765`, then open
 http://localhost:8765/. Choose a year on the bottom timeline, or press play.
 Compare years colors the ending year's polygons by percentage or dollar change
 against a selected baseline. Heights always represent the ending year's value.
-Click a polygon for the parcel's annual value history.
+Click a polygon for the parcel's annual just and assessed value history.
+
+Color by "Assessed as % of market" to see assessment caps: cool colors are
+parcels assessed well below just value, warm colors are assessed at full value.
+The title panel totals JV and AV for the parcels on screen. In Compare years it
+shows the percent change in each, counting only parcels with the same land use
+in both years so new construction doesn't inflate the result.
 
 Value fields are explicitly labeled: `AV_NSD` or `JV`. They come from the annual
 NAL files and are not asserted to be identical to the original map's `SOH_VAL`.

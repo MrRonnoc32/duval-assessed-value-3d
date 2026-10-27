@@ -63,16 +63,17 @@ async function showHistory(pid) {
     }
     if(version!==historyVersion)return;
     const rows=historyCache.get(shard)[pid]||[];
-    const value=r=>r[currentField==='v'?1:2];
-    const max=Math.max(1,...rows.map(value));
-    const points=rows.map(r=>`${12+(r[0]-2015)*27},${90-value(r)/max*75}`).join(' ');
-    const svg=`<svg viewBox="0 0 294 110" role="img" aria-label="Annual value history"><line x1="12" y1="90" x2="282" y2="90" stroke="#aaa"/><polyline fill="none" stroke="#2160a0" stroke-width="2" points="${points}"/>${rows.map(r=>`<circle cx="${12+(r[0]-2015)*27}" cy="${90-value(r)/max*75}" r="3" fill="#2160a0"/>`).join('')}<text x="12" y="105" font-size="10">2015</text><text x="255" y="105" font-size="10">2025</text></svg>`;
+    // History rows are [year, AV_NSD, JV, acres, use]. Chart both values on one scale.
+    const max=Math.max(1,...rows.map(r=>Math.max(r[1],r[2])));
+    const x=r=>12+(r[0]-2015)*27, yOf=val=>90-val/max*75;
+    const line=(i,color)=>`<polyline fill="none" stroke="${color}" stroke-width="2" points="${rows.map(r=>`${x(r)},${yOf(r[i])}`).join(' ')}"/>`+rows.map(r=>`<circle cx="${x(r)}" cy="${yOf(r[i])}" r="3" fill="${color}"/>`).join('');
+    const svg=`<svg viewBox="0 0 294 110" role="img" aria-label="Annual just and assessed value history"><line x1="12" y1="90" x2="282" y2="90" stroke="#aaa"/>${line(2,'#c0623a')}${line(1,'#2160a0')}<text x="12" y="105" font-size="10">2015</text><text x="255" y="105" font-size="10">2025</text></svg>`;
     const byYear=new Map(rows.map(r=>[r[0],r]));
     const table=Array.from({length:11},(_,i)=>2015+i).map(y=>{
       const r=byYear.get(y);
-      return `<tr${y===currentYear?' style="background:#e7f0f9"':''}><td>${y}</td><td>${r?fmtMoney(value(r)):'—'}</td><td>${r?fmtMoney(value(r)/r[3]):'—'}</td></tr>`;
+      return `<tr${y===currentYear?' style="background:#e7f0f9"':''}><td>${y}</td><td>${r?fmtMoney(r[2]):'—'}</td><td>${r?fmtMoney(r[1]):'—'}</td><td>${r?Math.round(100*r[1]/r[2])+'%':'—'}</td></tr>`;
     }).join('');
-    body.innerHTML=`<p>${currentField==='v'?'Assessed value (AV_NSD)':'Just value (JV)'}</p>${svg}<table><thead><tr><th>Year</th><th>Value</th><th>Per acre</th></tr></thead><tbody>${table}</tbody></table><p style="font-size:11px;color:#666">History follows matching parcel IDs. Boundaries may change. A dash means no mapped record for that year.</p>`;
+    body.innerHTML=`<p><span style="color:#c0623a">●</span> Just value (JV) &nbsp; <span style="color:#2160a0">●</span> Assessed (AV_NSD)</p>${svg}<table><thead><tr><th>Year</th><th>Just value</th><th>Assessed</th><th>% of JV</th></tr></thead><tbody>${table}</tbody></table><p style="font-size:11px;color:#666">History follows matching parcel IDs. Boundaries may change. A dash means no mapped record for that year.</p>`;
   }catch(error){if(version===historyVersion)body.textContent=error.message;}
 }
 

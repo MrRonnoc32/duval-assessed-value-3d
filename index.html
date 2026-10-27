@@ -59,7 +59,8 @@
     a { color: #2160a0; }
   #timeline {bottom:18px;left:calc(50% + 145px);transform:translateX(-50%);width:min(420px,calc(100vw - 350px));}
     #timeline input {width:100%;accent-color:#2160a0;} #timeline button {float:right;} .yearTicks {display:flex;justify-content:space-between;color:#666;font-size:11px;}
-    #status {bottom:110px;max-width:260px;} #historyPanel {top:115px;left:12px;width:310px;max-height:52vh;overflow:auto;} #historyPanel h2 {font-size:14px;margin:0 0 8px;} #closeHistory {float:right;} table {border-collapse:collapse;width:100%;font-size:11px;} th,td {padding:4px 2px;text-align:right;border-bottom:1px solid #ddd;} th:first-child,td:first-child {text-align:left;} [hidden] {display:none!important;}
+    #summary {margin-top:8px;padding-top:8px;border-top:1px solid #ddd;font-size:12px;color:#222;font-variant-numeric:tabular-nums;} #summary .row {display:flex;justify-content:space-between;gap:12px;} #summary .muted {color:#666;}
+    #status {bottom:110px;max-width:260px;} #historyPanel {top:200px;left:12px;width:310px;max-height:52vh;overflow:auto;} #historyPanel h2 {font-size:14px;margin:0 0 8px;} #closeHistory {float:right;} table {border-collapse:collapse;width:100%;font-size:11px;} th,td {padding:4px 2px;text-align:right;border-bottom:1px solid #ddd;} th:first-child,td:first-child {text-align:left;} [hidden] {display:none!important;}
     @media(max-width:650px) {#title {max-width:42vw;} #controls {max-width:40vw;padding:8px;} #controls input[type=range] {width:100%;} #legend {bottom:125px;max-width:42vw;min-width:0;padding:8px;} #timeline {left:50%;width:85vw;} #status {bottom:95px;max-width:40vw;} #historyPanel {width:80vw;top:110px;z-index:7;}}
   </style>
 </head>
@@ -70,6 +71,7 @@
 <div id="title" class="panel">
   <h1>Duval County — Assessed Value</h1>
   <p><span id="yearDescription">2025 assessed value (AV_NSD).</span> Drag to rotate, scroll to zoom. Click a parcel for its history.</p>
+  <div id="summary"></div>
 </div>
 
 <div id="legend" class="panel">
@@ -109,6 +111,7 @@
     <select id="colorSelect" class="metric">
       <option value="metric">Value (gradient)</option>
       <option value="category" selected>Land-use category</option>
+      <option value="ratio">Assessed as % of market</option>
     </select>
   </label>
   <label>Basemap:
@@ -153,12 +156,18 @@ const RAMP = [
   [217,103,145], [240,140,124], [247,177,106], [245,211,101], [239,238,117]
 ];
 
-function lerpColor(t) {
+// Assessed-as-%-of-market ramp: cool = heavily capped, warm = assessed at full market.
+const RATIO_RAMP = [
+  [37,84,166], [72,150,200], [150,205,200], [240,228,170], [244,160,90], [205,55,50]
+];
+const RATIO_LO = 0.2;  // ratios at or below 20% get the coolest color
+
+function lerpColor(t, ramp = RAMP) {
   t = Math.max(0, Math.min(1, t));
-  const x = t * (RAMP.length - 1);
+  const x = t * (ramp.length - 1);
   const i = Math.floor(x);
   const f = x - i;
-  const a = RAMP[i], b = RAMP[Math.min(i + 1, RAMP.length - 1)];
+  const a = ramp[i], b = ramp[Math.min(i + 1, ramp.length - 1)];
   return [
     Math.round(a[0] + (b[0] - a[0]) * f),
     Math.round(a[1] + (b[1] - a[1]) * f),
@@ -192,6 +201,10 @@ function metricValue(d) {
     return d.a > 0 ? d[currentField] / d.a : 0;
   }
   return d[currentField];
+}
+
+function ratioColor(d) {
+  return lerpColor((d.v / d.j - RATIO_LO) / (1 - RATIO_LO), RATIO_RAMP);
 }
 
 function valueToT(v) {
@@ -269,7 +282,7 @@ let parcelsRaw = null;     // raw array of {v, a, u, p}
 let currentFilterMin = 1000;
 let currentHeightMul = 1.0;
 let currentCurve = 0.45;   // exponent for elevation power-curve
-let currentColorMode = 'category'; // 'metric' | 'category'
+let currentColorMode = 'category'; // 'metric' | 'category' | 'ratio'
 let enabledCategories = null;      // Set<string> of category keys; null = all visible
 
 // Florida DOR Uniform Property Code → broad category.
@@ -406,9 +419,12 @@ function rebuildLayer() {
       const k = currentMetric === 'per_acre' ? 0.05 : 0.15;
       return Math.pow(Math.max(1, m), currentCurve) * k * currentHeightMul;
     },
-    getFillColor: d => viewMode === 'change' ? changeColor(d) : currentColorMode === 'category'
-      ? categoryColor(d.u)
-      : lerpColor(valueToT(metricValue(d))),
+    getFillColor: d => {
+      if (viewMode === 'change') return changeColor(d);
+      if (currentColorMode === 'category') return categoryColor(d.u);
+      if (currentColorMode === 'ratio') return ratioColor(d);
+      return lerpColor(valueToT(metricValue(d)));
+    },
     getLineColor: [0, 0, 0, 0],
     extruded: true,
     pickable: true,
@@ -429,9 +445,10 @@ function rebuildLayer() {
         tooltip.style.top = y + 'px';
         tooltip.innerHTML =
           `<b>${currentYear} · ${object.i}</b><br><b>${cat}</b> <span style="opacity:.7">(DOR ${object.u || '—'})</span><br>` +
-          `<b>${currentField === "v" ? "Assessed value" : "Just value"}:</b> ${fmtMoney(object[currentField])}<br>` +
+          `<b>Just value (JV):</b> ${fmtMoney(object.j)}<br>` +
+          `<b>Assessed (AV_NSD):</b> ${fmtMoney(object.v)} <span style="opacity:.7">(${Math.round(object.v / object.j * 100)}% of JV)</span><br>` +
           `<b>Acres:</b> ${object.a ? object.a.toFixed(2) : '—'}<br>` +
-          `<b>$/acre:</b> ${perAcre !== null ? fmtMoney(perAcre) : '—'}` + (viewMode === 'change' ? `<br><b>Since ${baselineYear}:</b> ${changePercent(object) === null ? 'No matching parcel' : (changeUnit==='percent' ? changePercent(object).toFixed(1)+'%' : (changeAmount(object)<0?'−':'+')+fmtMoney(Math.abs(changeAmount(object))))}` : '');
+          `<b>${currentField === "v" ? "Assessed" : "Just value"} $/acre:</b> ${perAcre !== null ? fmtMoney(perAcre) : '—'}` + (viewMode === 'change' ? `<br><b>Since ${baselineYear}:</b> ${changePercent(object) === null ? 'No matching parcel' : (changeUnit==='percent' ? changePercent(object).toFixed(1)+'%' : (changeAmount(object)<0?'−':'+')+fmtMoney(Math.abs(changeAmount(object))))}` : '');
       } else {
         tooltip.style.display = 'none';
       }
@@ -439,6 +456,39 @@ function rebuildLayer() {
   });
   deckOverlay.setProps({ layers: [layer] });
   status.textContent = `${currentYear} · ${new Set(filtered.map(d=>d.i)).size.toLocaleString()} parcels shown`;
+  renderSummary(filtered);
+}
+
+// Totals for the parcels on screen, counting each parcel ID once. In compare
+// mode, only parcels present in both years with the same land-use category count,
+// so new construction on formerly vacant lots doesn't inflate the % changes.
+function renderSummary(rows) {
+  const seen = new Set();
+  let n = 0, j = 0, v = 0, j0 = 0, v0 = 0;
+  for (const d of rows) {
+    if (seen.has(d.i)) continue;
+    seen.add(d.i);
+    if (viewMode === 'change') {
+      const base = baselineValues.get(d.i);
+      if (!base || dorCategory(base.u) !== dorCategory(d.u)) continue;
+      j0 += base.j; v0 += base.v;
+    }
+    n++; j += d.j; v += d.v;
+  }
+  const el = document.getElementById('summary');
+  if (viewMode === 'change') {
+    const chg = (a, b) => a > 0 ? `${b >= a ? '+' : '−'}${Math.abs(100 * (b / a - 1)).toFixed(1)}%` : '—';
+    el.innerHTML =
+      `<div class="muted">${n.toLocaleString()} parcels with the same land use in ${baselineYear} and ${currentYear}</div>` +
+      `<div class="row"><span>Just value (JV)</span><b>${chg(j0, j)}</b></div>` +
+      `<div class="row"><span>Assessed (AV_NSD)</span><b>${chg(v0, v)}</b></div>` +
+      `<div class="row muted"><span>Assessed as % of JV</span><span>${j0 > 0 ? Math.round(100 * v0 / j0) : '—'}% → ${j > 0 ? Math.round(100 * v / j) : '—'}%</span></div>`;
+  } else {
+    el.innerHTML =
+      `<div class="muted">${currentYear} · ${n.toLocaleString()} parcels on screen</div>` +
+      `<div class="row"><span>Just value (JV)</span><b>${fmtMoney(j)}</b></div>` +
+      `<div class="row"><span>Assessed <span class="muted">(${j > 0 ? Math.round(100 * v / j) : '—'}% of JV)</span></span><b>${fmtMoney(v)}</b></div>`;
+  }
 }
 
 document.getElementById('heightSlider').addEventListener('input', e => {
@@ -545,9 +595,10 @@ function updateLegendVisibility() {
   const dom = METRIC_DOMAINS[currentMetric];
   document.getElementById('legendGradient').style.display = compare || currentColorMode !== 'category' ? '' : 'none';
   document.getElementById('legendCategory').style.display = compare || currentColorMode === 'category' ? '' : 'none';
-  document.getElementById('legendTitle').innerHTML = compare ? `<b>Change ${baselineYear}–${currentYear}</b> (${changeUnit==='percent'?'%':currentMetric==='per_acre'?'$/acre':'$'})` : `<b>${dom.title.replace('Assessed value',currentField === 'v' ? 'Assessed value' : 'Just value')}</b> (log scale)`;
-  document.querySelector('#legend .scale').style.background = compare ? 'linear-gradient(to right,#3769b9,#eeeee6,#c84132)' : '';
-  document.getElementById('legendTicks').innerHTML = (compare ? (changeUnit==='percent'?['−100%','0%','+100%+']:currentMetric==='per_acre'?['−$1M','$0','+$1M+']:['−$100k','$0','+$100k+']) : dom.ticks).map(t=>`<span>${t}</span>`).join('');
+  const ratio = !compare && currentColorMode === 'ratio';
+  document.getElementById('legendTitle').innerHTML = compare ? `<b>Change ${baselineYear}–${currentYear}</b> (${changeUnit==='percent'?'%':currentMetric==='per_acre'?'$/acre':'$'})` : ratio ? '<b>Assessed value as % of just value</b>' : `<b>${dom.title.replace('Assessed value',currentField === 'v' ? 'Assessed value' : 'Just value')}</b> (log scale)`;
+  document.querySelector('#legend .scale').style.background = compare ? 'linear-gradient(to right,#3769b9,#eeeee6,#c84132)' : ratio ? `linear-gradient(to right,${RATIO_RAMP.map(c=>`rgb(${c.join(',')})`).join(',')})` : '';
+  document.getElementById('legendTicks').innerHTML = (compare ? (changeUnit==='percent'?['−100%','0%','+100%+']:currentMetric==='per_acre'?['−$1M','$0','+$1M+']:['−$100k','$0','+$100k+']) : ratio ? ['≤20%','40%','60%','80%','100%'] : dom.ticks).map(t=>`<span>${t}</span>`).join('');
   document.getElementById('colorSelect').disabled = compare;
   document.getElementById('changeControl').hidden=!compare;
   document.getElementById('comparisonNote').hidden=!compare;
